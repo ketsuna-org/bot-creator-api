@@ -44,5 +44,10 @@
     make -j$NIX_BUILD_CORES
   '';
 
+  scripts.start.exec = ''
+    cd app
+    go run cmd/main.go
+  '';
+
   # Supprimer la configuration brew inutile dans Nix
 }
