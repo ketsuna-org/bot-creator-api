@@ -1,0 +1,49 @@
+{ pkgs, lib, config, inputs, ... }:
+
+{
+  env = {
+    CXXFLAGS = "-std=c++20";
+    PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig"; # Critical pour trouver OpenSSL
+    NIX_CFLAGS_COMPILE = "-arch arm64";
+  };
+
+  packages = with pkgs; [
+    git
+    gcc
+    cmake
+    clang-tools
+    openssl.dev  # Inclure les headers de développement
+    zlib.dev
+    libopus
+    pkg-config
+    (stdenv.mkDerivation {
+        name = "dpp";
+        version = "latest";
+        src = fetchFromGitHub {
+          owner = "brainboxdotcc";
+          repo = "DPP";
+          rev = "c6bcab5b4632fe35e32e63e3bc813e9e2cd2893e";
+          sha256 = "sha256-IMESnvvjATgsKCDfrRY8bPxUYpiULIPFf6SToO7GbVM=";
+        };
+        nativeBuildInputs = [ cmake pkg-config ];
+        buildInputs = [ openssl zlib libopus ];
+        cmakeFlags = [
+          "-DCMAKE_CXX_STANDARD=20"
+          "-DCMAKE_BUILD_TYPE=Release"
+          "-DBUILD_TEST=OFF"
+          "-DBUILD_EXAMPLES=OFF"
+        ];
+      })  # Nécessaire pour détecter OpenSSL
+  ];
+
+  languages.go.enable = true;
+
+  scripts.build.exec = ''
+    mkdir -p bot/build
+    cd bot/build
+    cmake ..
+    make -j$NIX_BUILD_CORES
+  '';
+
+  # Supprimer la configuration brew inutile dans Nix
+}
