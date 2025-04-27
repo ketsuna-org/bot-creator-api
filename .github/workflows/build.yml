@@ -11,36 +11,75 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push-api-image:
-    runs-on: ubuntu-latest
+  build-api-image:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]  # Matrix with both AMD64 and ARM64 runners
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            tag: amd64
+          - os: ubuntu-24.04-arm
+            platform: linux/arm64
+            tag: arm64
     permissions:
       contents: read
       packages: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Set up QEMU
+
+      - name: Set up QEMU for multi-architecture
         uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta-api
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-      - name: Build and push Proxy Docker image
+
+      - name: Build Docker image for ${{ matrix.tag }}
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-api.outputs.tags }}
+          platforms: ${{ matrix.platform }}  # Specify the platform for the build
+          push: false  # Do not push yet
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
           labels: ${{ steps.meta-api.outputs.labels }}
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:cache
           cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
+
+  merge-and-push:
+    runs-on: ubuntu-latest
+    needs: build-api-image  # This ensures the merge happens only after build is complete
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge Docker images and push multi-arch image
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
