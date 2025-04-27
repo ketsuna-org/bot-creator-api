@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/ketsuna-org/bot-creator-api/internal"
 )
@@ -52,7 +53,7 @@ func main() {
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
-	signal.Notify(signals, os.Kill)
+	signal.Notify(signals, syscall.SIGTERM)
 	go func() {
 		sig := <-signals
 		log.Printf("Received signal: %s", sig)
