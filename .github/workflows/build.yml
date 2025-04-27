@@ -58,8 +58,6 @@ jobs:
           push: false  # Do not push yet
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
           labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:cache
-          cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:cache,mode=max
 
   merge-and-push:
     runs-on: ubuntu-latest
