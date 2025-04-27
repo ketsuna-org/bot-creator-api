@@ -82,4 +82,3 @@ jobs:
             --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64 \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
