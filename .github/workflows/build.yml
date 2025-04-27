@@ -55,7 +55,7 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}  # Specify the platform for the build
-          push: false  # Do not push yet
+          push: true  # Do not push yet
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
           labels: ${{ steps.meta-api.outputs.labels }}
 
