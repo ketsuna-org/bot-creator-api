@@ -28,7 +28,6 @@
         buildInputs = [ openssl zlib libopus ];
         cmakeFlags = [
           "-DCMAKE_CXX_STANDARD=20"
-          "-DCMAKE_BUILD_TYPE=Release"
           "-DBUILD_TEST=OFF"
           "-DBUILD_EXAMPLES=OFF"
         ];

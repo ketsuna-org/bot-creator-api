@@ -1,0 +1,60 @@
+# Étape de compilation pour le programme Go
+FROM golang:1.23-alpine AS go-builder
+WORKDIR /app
+COPY app/ .
+RUN CGO_ENABLED=0 go build -o /api main.go
+
+# Étape de compilation pour le programme C++ avec DPP
+FROM ubuntu:24.04 AS cpp-builder
+
+# Installation des dépendances système
+RUN apt-get update && \
+    apt-get install -y \
+    git \
+    gcc \
+    g++ \
+    cmake \
+    clang-tools \
+    libssl-dev \
+    zlib1g-dev \
+    libopus-dev \
+    pkg-config
+
+# Clonage de DPP avec le commit spécifique
+RUN git clone https://github.com/brainboxdotcc/DPP.git /dpp && \
+    cd /dpp && \
+    git checkout c6bcab5b4632fe35e32e63e3bc813e9e2cd2893e && \
+    git submodule update --init --recursive
+
+# Construction de DPP
+RUN mkdir -p /dpp/build && \
+    cd /dpp/build && \
+    cmake .. -DDPP_BUILD_TEST=OFF && \
+    make -j$(nproc) && \
+    make install
+
+# Construction du bot utilisateur
+WORKDIR /bot
+COPY bot/ .
+RUN mkdir -p build && \
+    cd build && \
+    cmake .. -DCMAKE_PREFIX_PATH=/dpp/build && \
+    make -j$(nproc)
+
+# Étape finale d'exécution
+FROM alpine:3.21
+WORKDIR /app
+
+# Copie des binaires
+COPY --from=go-builder /api .
+COPY --from=cpp-builder /bot/build/bot .
+
+# Installation des dépendances runtime
+RUN apk add --no-cache \
+    libstdc++ \
+    libssl3 \
+    zlib \
+    opus
+
+# Configuration des points d'entrée
+ENTRYPOINT ["/app/api"]
