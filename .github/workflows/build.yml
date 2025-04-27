@@ -62,24 +62,33 @@ jobs:
           cache-to: type=gha,mode=max
 
   merge-and-push:
-    runs-on: ubuntu-latest
-    needs: build-api-image  # This ensures the merge happens only after build is complete
-    permissions:
-      contents: read
-      packages: write
+      runs-on: ubuntu-latest
+      needs: build-api-image  # This ensures the merge happens only after build is complete
+      permissions:
+        contents: read
+        packages: write
 
-    steps:
-      - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      steps:
+        - name: Log in to the Container registry
+          uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+          with:
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge Docker images and push multi-arch image
-        run: |
-          docker buildx imagetools create \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64 \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        - name: Pull amd64 image
+          run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64
+
+        - name: Pull arm64 image
+          run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
+
+        - name: Merge Docker images and push multi-arch image
+          run: |
+            docker buildx imagetools create \
+              --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:amd64 \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:arm64
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+
+
