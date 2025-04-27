@@ -1,0 +1,24 @@
+# Ignore any directory named build at any level
+build/
+**/build/
+
+# Ignore any file or directory with 'build' in its name
+*build*
+**/*build*
+
+# Ignore common build artifacts
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dll
+*.pyc
+*.class
+
+# Optionally, ignore CMake and Make build folders
+CMakeFiles/
+cmake-build-*/
+Makefile
+CMakeCache.txt

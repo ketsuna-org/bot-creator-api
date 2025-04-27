@@ -3,6 +3,7 @@
 #include <mutex>
 #include <vector>
 #include <queue>
+#include <algorithm>  // Nécessaire pour std::remove_if
 #include <functional>
 #include <sys/socket.h>
 #include <sys/un.h>

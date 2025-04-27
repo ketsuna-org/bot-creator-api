@@ -44,8 +44,7 @@
   '';
 
   scripts.start.exec = ''
-    cd app
-    go run cmd/main.go
+    go run app/cmd/main.go
   '';
 
   # Supprimer la configuration brew inutile dans Nix

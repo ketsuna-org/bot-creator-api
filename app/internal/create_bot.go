@@ -25,7 +25,7 @@ func Start(b *Bot) (net.Conn, error) {
 	}
 
 	// Configuration du bot
-	cmd := exec.Command("../bot/build/discord-bot", b.BotToken)
+	cmd := exec.Command("./bot/build/discord-bot", b.BotToken)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true, // Permet de kill le processus enfant si nécessaire
 	}

@@ -23,8 +23,8 @@ func main() {
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
 	})
-	botId := "XXXXX"
-	botToken := "XXXXX"
+	botId := "xxxxx"
+	botToken := "xxxxx"
 
 	bot := &internal.Bot{
 		BotID:    botId,
