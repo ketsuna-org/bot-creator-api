@@ -20,7 +20,7 @@ namespace app
         return g.get_icon_url(1024, i_webp);
     }
 
-    std::string update_string(const std::string &initial, const std::map<std::string, std::string> &updates)
+    std::string update_string(const std::string &initial, const std::unordered_map<std::string, std::string> &updates)
     {
         static const std::regex placeholderRegex(R"(\(\((.*?)\)\))", std::regex::icase);
 
@@ -62,12 +62,12 @@ namespace app
         return result;
     }
     // Forward declaration
-    void process_interaction_option(const slashcommand_t &event, const command_data_option &option, std::map<std::string, std::string> &kv);
+    void process_interaction_option(const slashcommand_t &event, const command_data_option &option, std::unordered_map<std::string, std::string> &kv);
 
     // Génère la map clé/valeur
-    std::map<std::string, std::string> generate_key_values(const slashcommand_t &event)
+    std::unordered_map<std::string, std::string> generate_key_values(const slashcommand_t &event)
     {
-        std::map<std::string, std::string> key_values;
+        std::unordered_map<std::string, std::string> key_values;
         const guild *g = event.command.is_guild_interaction() ? &event.command.get_guild() : nullptr;
         const channel &c = event.command.get_channel();
         const user &u = event.command.get_issuing_user();
@@ -98,7 +98,7 @@ namespace app
     }
 
     // Traite une option d'interaction récursivement
-    void process_interaction_option(const slashcommand_t &event, const command_data_option &option, std::map<std::string, std::string> &kv)
+    void process_interaction_option(const slashcommand_t &event, const command_data_option &option, std::unordered_map<std::string, std::string> &kv)
     {
         switch (option.type)
         {
@@ -183,5 +183,33 @@ namespace app
         }
         break;
         }
+    }
+
+    nlohmann::json json_from_string(const std::string &str)
+    {
+        nlohmann::json j;
+        try
+        {
+            j = nlohmann::json::parse(str);
+        }
+        catch (const nlohmann::json::parse_error &e)
+        {
+            std::cerr << "JSON parse error: " << e.what() << std::endl;
+        }
+        return j;
+    }
+
+    std::string string_from_json(const nlohmann::json &j)
+    {
+        std::string str;
+        try
+        {
+            str = j.dump();
+        }
+        catch (const nlohmann::json::exception &e)
+        {
+            std::cerr << "JSON exception: " << e.what() << std::endl;
+        }
+        return str;
     }
 }

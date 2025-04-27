@@ -6,10 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Find required dependencies
-find_package(OpenSSL REQUIRED)
-find_package(ZLIB REQUIRED)
-
 # Configure DPP library (assuming you have it installed via Nix)
 find_package(dpp REQUIRED
     HINTS ${DPP_INCLUDE_DIR}  # Add path if needed: /nix/store/.../include
@@ -29,17 +25,11 @@ add_executable(${PROJECT_NAME}
 # Link libraries with proper dependencies
 target_link_libraries(${PROJECT_NAME} PRIVATE
     dpp
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    ZLIB::ZLIB
-    pthread  # Required for DPP's threading
 )
 
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${DPP_INCLUDE_DIRS}
-    ${OPENSSL_INCLUDE_DIR}
-    ${Sodium_INCLUDE_DIRS}
 )
 
 # macOS ARM64 specific fixes
