@@ -5,49 +5,59 @@ COPY app/ .
 RUN CGO_ENABLED=0 go build -o /api/app ./cmd/main.go
 
 # Étape de compilation pour le programme C++ avec DPP
-FROM alpine:3.21 AS cpp-builder
-RUN apk add --no-cache build-base cmake git openssl-dev zlib-dev opus-dev clang
+FROM ubuntu:24.04 AS cpp-builder
 
-# Clonage de DPP
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    libssl-dev \
+    zlib1g-dev \
+    libopus-dev \
+    clang \
+    pkg-config
+
+# Clone DPP
 RUN git clone https://github.com/brainboxdotcc/DPP.git /dpp && \
     cd /dpp && \
     git checkout c6bcab5b4632fe35e32e63e3bc813e9e2cd2893e && \
     git submodule update --init --recursive
 
-# Construction de DPP
+# Build DPP (shared)
 RUN mkdir -p /dpp/build && \
     cd /dpp/build && \
-    cmake .. -DDPP_BUILD_TEST=OFF && \
+    cmake .. \
+    -DDPP_BUILD_TEST=OFF && \
     make -j$(nproc) && \
-    make install && \
-    cp -r /dpp/include/dpp /usr/include/ && \
-    cp /usr/local/lib/libdpp* /usr/lib/
+    make install
 
-# Construction du bot utilisateur
+# Build user bot
 WORKDIR /src
 COPY bot/ .
 
-# Construction en pointant vers DPP installé localement
 RUN mkdir build && cd build && \
-    cmake .. && \
+    cmake .. \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_PREFIX_PATH=/usr/local && \
     make -j$(nproc)
 
 # Étape finale d'exécution
-FROM alpine:3.21
+FROM ubuntu:24.04
 WORKDIR /app
+
+# Install runtime deps
+RUN apt-get update && apt-get install -y libssl3 zlib1g libopus0 && apt-get clean
 
 # Copie des binaires
 COPY --from=go-builder /api ./api
-COPY --from=cpp-builder /usr/local/lib/libdpp* /usr/lib/
 COPY --from=cpp-builder /src/build/discord-bot ./bot/build/discord-bot
+COPY --from=cpp-builder /usr/local/lib/ /usr/local/lib/
 
-# Installation des dépendances runtime
-RUN apk add --no-cache \
-    libstdc++ \
-    libssl3 \
-    zlib \
-    opus
-
+# Make sure executables are runnable
 RUN chmod +x ./api/app ./bot/build/discord-bot
+
+# Pour être sûr que libdpp.so soit trouvée
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 ENTRYPOINT ["./api/app"]
