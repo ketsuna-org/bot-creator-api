@@ -25,6 +25,10 @@ add_executable(${PROJECT_NAME}
 # Link libraries with proper dependencies
 target_link_libraries(${PROJECT_NAME} PRIVATE
     dpp
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    z
+    opus
 )
 
 # Include directories
