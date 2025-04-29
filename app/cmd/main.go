@@ -12,25 +12,30 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
+var botList = make(map[string]*internal.Bot)
+
 func init() {
-	// Initialize the application
+	// Initialisation de l'application
 }
 
 func main() {
 
+	// Créer un ServeMux
 	mux := http.NewServeMux()
-	// Start the application
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+
+	// Route principale
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, World!"))
 	})
-	botToken := "XXXXXXXXXXXX" // Replace with your bot token
 
+	// Contexte ZeroMQ
 	ctx, err := zmq.NewContext()
 	if err != nil {
 		log.Fatalf("[SERVER] Failed to create context: %v", err)
 	}
 	defer ctx.Term()
 
+	// Socket dealer ZeroMQ
 	dealer, err := ctx.NewSocket(zmq.REP)
 	if err != nil {
 		log.Fatalf("[SERVER] Failed to create dealer: %v", err)
@@ -42,58 +47,97 @@ func main() {
 		log.Fatalf("[SERVER] Failed to bind dealer: %v", err)
 	}
 
-	bot := &internal.Bot{
-		BotToken: botToken,
-	}
+	// Route POST /create/{bot_token}
+	mux.HandleFunc("POST /create/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
+		// Extraire le token du bot de l'URL
+		botToken := r.URL.Query().Get("bot_token")
 
-	bot, err = internal.Start(bot, dealer)
-	if err != nil {
-		log.Fatalf("[SERVER] Error starting bot: %v", err)
-	}
-	// Handle the bot connection
-	data, err := json.Marshal(map[string]interface{}{
-		"command": "update",
-		"data": map[string]interface{}{
-			"ping": map[string]string{
-				"response": "pong ((userName))",
-			},
-		},
+		bot := &internal.Bot{
+			BotToken: botToken,
+		}
+		bot, err := internal.Start(bot, dealer)
+		if err != nil {
+			log.Printf("[SERVER] Error starting bot: %v", err)
+			http.Error(w, "Error starting bot", http.StatusInternalServerError)
+			return
+		}
+		botList[botToken] = bot
+		log.Printf("[SERVER] Bot started successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Bot started successfully"))
 	})
-	if err != nil {
-		log.Fatalf("[SERVER] Error marshaling JSON: %v", err)
-	}
-	go bot.SendMessage(string(data))
 
-	dataX, err := json.Marshal(map[string]interface{}{
-		"command": "update",
-		"data": map[string]interface{}{
-			"ping": map[string]string{
-				"response": "pong ((userName)) avec une modif !",
-			},
-		},
+	// Route POST /stop/{bot_token}
+	mux.HandleFunc("POST /stop/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
+		// Extraire le token du bot de l'URL
+		botToken := r.URL.Query().Get("bot_token")
+
+		bot, ok := botList[botToken]
+		if !ok {
+			http.Error(w, "Bot not found", http.StatusNotFound)
+			return
+		}
+		if err := bot.Stop(); err != nil {
+			log.Printf("[SERVER] Error stopping bot: %v", err)
+			http.Error(w, "Error stopping bot", http.StatusInternalServerError)
+			return
+		}
+		delete(botList, botToken)
+		log.Printf("[SERVER] Bot stopped successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Bot stopped successfully"))
 	})
-	if err != nil {
-		log.Fatalf("[SERVER] Error marshaling JSON: %v", err)
-	}
-	go bot.SendMessage(string(dataX))
-	// Handle if signal is received
 
+	// Route POST /update/{bot_token}
+	mux.HandleFunc("POST /update/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
+		// Extraire le token du bot de l'URL
+		botToken := r.URL.Query().Get("bot_token")
+		bot, ok := botList[botToken]
+		if !ok {
+			http.Error(w, "Bot not found", http.StatusNotFound)
+			return
+		}
+		body := make(map[string]interface{})
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			log.Printf("[SERVER] Error decoding JSON: %v", err)
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+		data, err := json.Marshal(body)
+		if err != nil {
+			log.Printf("[SERVER] Error marshaling JSON: %v", err)
+			http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+			return
+		}
+		if err := bot.SendMessage(string(data)); err != nil {
+			log.Printf("[SERVER] Error sending message: %v", err)
+			http.Error(w, "Error sending message", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[SERVER] Bot updated successfully")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Bot updated successfully"))
+	})
+
+	// Gestion des signaux pour l'arrêt propre
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 	signal.Notify(signals, syscall.SIGTERM)
 	go func() {
 		sig := <-signals
 		log.Printf("Received signal: %s", sig)
-		// let's kill the bot
-		if bot.Cmd != nil {
-			if err := bot.Cmd.Process.Kill(); err != nil {
-				log.Printf("[SERVER] Error killing bot process: %v", err)
-			} else {
-				log.Printf("[SERVER] Bot process killed successfully")
+		// Arrêter tous les bots en cours
+		for _, bot := range botList {
+			if err := bot.Stop(); err != nil {
+				log.Printf("[SERVER] Error stopping bot: %v", err)
 			}
+			delete(botList, bot.BotToken)
 		}
-		// let's remove the socket
+		// Quitter l'application
 		os.Exit(0)
 	}()
-	panic(http.ListenAndServe(":2030", mux))
+
+	// Démarrer le serveur HTTP
+	log.Printf("[SERVER] Starting server on :2030")
+	log.Fatal(http.ListenAndServe(":2030", mux))
 }

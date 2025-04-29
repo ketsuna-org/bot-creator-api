@@ -48,6 +48,8 @@
   '';
 
   scripts.start.exec = ''
+    build
+    mv bot/build/discord-bot ./app
     cd app
     go run cmd/main.go
   '';

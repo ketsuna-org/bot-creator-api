@@ -55,17 +55,24 @@ FROM ubuntu:24.04
 WORKDIR /app
 
 # Install runtime deps
-RUN apt-get update && apt-get install -y libssl3 zlib1g libopus0 && apt-get clean
-
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    zlib1g \
+    libopus0 \
+    libsodium23 \
+    libzmq5 \
+    && apt-get clean
 # Copie des binaires
-COPY --from=go-builder /api ./api
-COPY --from=cpp-builder /src/build/discord-bot ./bot/build/discord-bot
+COPY --from=go-builder /api/app ./app
+COPY --from=cpp-builder /src/build/discord-bot ./discord-bot
 COPY --from=cpp-builder /usr/local/lib/ /usr/local/lib/
 
 # Make sure executables are runnable
-RUN chmod +x ./api/app ./bot/build/discord-bot
+RUN chmod +x ./app ./discord-bot
 
 # Pour être sûr que libdpp.so soit trouvée
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-ENTRYPOINT ["./api/app"]
+EXPOSE 2030
+
+ENTRYPOINT ["./app"]
