@@ -205,15 +205,37 @@ namespace app
                         }
                         // let's retrieve the current channel
                         const dpp::channel *channel_ptr = &event.command.get_channel();
+                        int amount = 0;
                         if (action.contains("amount"))
                         {
-                            int amount = action["amount"];
+                            amount = action["amount"];
                             // let's retrieve the amount of messages to delete
                             if (amount < 0 || amount > 100)
                             {
                                 event.reply(error);
                                 return false;
                             }
+                        }
+                        else if (action.contains("depend_on"))
+                        {
+                            std::string depend_on = action["depend_on"];
+                            auto it = key_values.find(depend_on);
+                            if (it != key_values.end())
+                            {
+                                std::string depend_on_value = it->second;
+
+                                // let's convert the depend_on_value to an int
+                                int amount = std::stoi(depend_on_value);
+                                if (amount < 0 || amount > 100)
+                                {
+                                    event.reply(error);
+                                    return false;
+                                }
+                            }
+                        }
+
+                        if (amount > 0)
+                        {
 
                             bot.messages_get(event.command.channel_id, 0, 0, 0, amount, [&event, &bot, &error, &channel_ptr](const dpp::confirmation_callback_t &callback)
                                              {
@@ -241,51 +263,6 @@ namespace app
                                                  {
                                                      bot.co_message_delete_bulk(msg_ids, channel_ptr->id);
                                                  } });
-                        }
-                        else if (action.contains("depend_on"))
-                        {
-                            std::string depend_on = action["depend_on"];
-
-                            auto it = key_values.find(depend_on);
-                            if (it != key_values.end())
-                            {
-                                std::string depend_on_value = it->second;
-
-                                // let's convert the depend_on_value to an int
-                                int amount = std::stoi(depend_on_value);
-                                if (amount < 0 || amount > 100)
-                                {
-                                    event.reply(error);
-                                    return false;
-                                }
-                                // Handle delete messages action based on depend_on
-                                bot.messages_get(event.command.channel_id, 0, 0, 0, amount, [&event, &bot, &error, &channel_ptr](const dpp::confirmation_callback_t &callback)
-                                                 {
-                                                     if (callback.is_error())
-                                                     {
-                                                         event.reply(error);
-                                                         return false;
-                                                     }
-
-                                                     auto messages = callback.get<dpp::message_map>();
-
-                                                     std::vector<snowflake> msg_ids;
-
-                                                     for (const auto &msg : messages)
-                                                     {
-                                                         // let's check if the message is older than 2 weeks
-                                                         if (std::chrono::system_clock::from_time_t(msg.second.get_creation_time()) < std::chrono::system_clock::now() - std::chrono::hours(24 * 14))
-                                                         {
-                                                             // delete the message
-                                                             msg_ids.push_back(msg.second.id);
-                                                         }
-                                                     }
-
-                                                     if (!msg_ids.empty())
-                                                     {
-                                                         bot.co_message_delete_bulk(msg_ids, channel_ptr->id);
-                                                     } });
-                            }
                         }
                     }
                 }
