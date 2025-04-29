@@ -48,11 +48,12 @@ FROM ubuntu:24.04
 WORKDIR /app
 
 # Install runtime deps
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install --reinstall -y \
     libssl3 \
     zlib1g \
     libopus0 \
     libsodium23 \
+    ca-certificates \
     && apt-get clean
 # Copie des binaires
 COPY --from=go-builder /api/app ./app
