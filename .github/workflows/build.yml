@@ -58,8 +58,8 @@ jobs:
           push: true  # Do not push yet
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
           labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ github.ref }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref }}-${{ matrix.platform }}
 
   merge-and-push:
     runs-on: ubuntu-latest
