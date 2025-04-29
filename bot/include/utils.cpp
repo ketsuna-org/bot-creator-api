@@ -150,7 +150,7 @@ namespace app
             snowflake mentionable_id = std::get<snowflake>(option.value);
             auto member_ptr = event.command.get_resolved_member(mentionable_id);
             const user &u = *member_ptr.get_user();
-            kv["opts." +option.name] = u.username;
+            kv["opts." + option.name] = u.username;
             kv["opts." + option.name + ".id"] = u.id.str();
             kv["opts." + option.name + ".avatar"] = make_avatar_url(u);
             kv["opts." + option.name + ".discriminator"] = std::to_string(u.discriminator);
@@ -183,6 +183,116 @@ namespace app
         }
         break;
         }
+    }
+
+    bool handle_actions(const slashcommand_t &event, const nlohmann::json &actions, const std::unordered_map<std::string, std::string> &key_values, dpp::cluster &bot)
+    {
+        // Actions are a list of Objects
+        if (actions.is_array())
+        {
+            for (const auto &action : actions)
+            {
+                if (action.contains("type"))
+                {
+                    std::string action_type = action["type"];
+                    if (action_type == "delete_messages" && event.command.is_guild_interaction())
+                    {
+
+                        std::string error = "Amount must be between 1 and 100";
+                        if (action.contains("error"))
+                        {
+                            error = action["error"].get<std::string>();
+                        }
+                        // let's retrieve the current channel
+                        const dpp::channel *channel_ptr = &event.command.get_channel();
+                        if (action.contains("amount"))
+                        {
+                            int amount = action["amount"];
+                            // let's retrieve the amount of messages to delete
+                            if (amount < 0 || amount > 100)
+                            {
+                                event.reply(error);
+                                return false;
+                            }
+
+                            bot.messages_get(event.command.channel_id, 0, 0, 0, amount, [&event, &bot, &error, &channel_ptr](const dpp::confirmation_callback_t &callback)
+                                             {
+                                                 if (callback.is_error())
+                                                 {
+                                                     event.reply(error);
+                                                     return false;
+                                                 }
+
+                                                 auto messages = callback.get<dpp::message_map>();
+
+                                                 std::vector<snowflake> msg_ids;
+
+                                                 for (const auto &msg : messages)
+                                                 {
+                                                     // let's check if the message is older than 2 weeks
+                                                     if (std::chrono::system_clock::from_time_t(msg.second.get_creation_time()) < std::chrono::system_clock::now() - std::chrono::hours(24 * 14))
+                                                     {
+                                                         // delete the message
+                                                         msg_ids.push_back(msg.second.id);
+                                                     }
+                                                 }
+
+                                                 if (!msg_ids.empty())
+                                                 {
+                                                     bot.co_message_delete_bulk(msg_ids, channel_ptr->id);
+                                                 } });
+                        }
+                        else if (action.contains("depend_on"))
+                        {
+                            std::string depend_on = action["depend_on"];
+
+                            auto it = key_values.find(depend_on);
+                            if (it != key_values.end())
+                            {
+                                std::string depend_on_value = it->second;
+
+                                // let's convert the depend_on_value to an int
+                                int amount = std::stoi(depend_on_value);
+                                if (amount < 0 || amount > 100)
+                                {
+                                    event.reply(error);
+                                    return false;
+                                }
+                                // Handle delete messages action based on depend_on
+                                bot.messages_get(event.command.channel_id, 0, 0, 0, amount, [&event, &bot, &error, &channel_ptr](const dpp::confirmation_callback_t &callback)
+                                                 {
+                                                     if (callback.is_error())
+                                                     {
+                                                         event.reply(error);
+                                                         return false;
+                                                     }
+
+                                                     auto messages = callback.get<dpp::message_map>();
+
+                                                     std::vector<snowflake> msg_ids;
+
+                                                     for (const auto &msg : messages)
+                                                     {
+                                                         // let's check if the message is older than 2 weeks
+                                                         if (std::chrono::system_clock::from_time_t(msg.second.get_creation_time()) < std::chrono::system_clock::now() - std::chrono::hours(24 * 14))
+                                                         {
+                                                             // delete the message
+                                                             msg_ids.push_back(msg.second.id);
+                                                         }
+                                                     }
+
+                                                     if (!msg_ids.empty())
+                                                     {
+                                                         bot.co_message_delete_bulk(msg_ids, channel_ptr->id);
+                                                     } });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     nlohmann::json json_from_string(const std::string &str)

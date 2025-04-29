@@ -18,18 +18,24 @@ int main(int argc, char* argv[]) {
 
     bot.on_log(dpp::utility::cout_logger());
 
-    bot.on_slashcommand([&json_data](const dpp::slashcommand_t& event) {
+    bot.on_slashcommand([&json_data, &bot](const dpp::slashcommand_t& event) {
         std::unordered_map<std::string, std::string> key_values = app::generate_key_values(event);
         std::string command_name = event.command.get_command_name();
         std::string response = "Interaction found, but no response found.";
 
         if (!command_name.empty() && json_data->contains(command_name)) {
             auto& command_data = (*json_data)[command_name];
-            if (command_data.contains("response")) {
+            bool no_error = true;
+            if (command_data.contains("action")) {
+                auto& action = command_data["action"];
+                // Actions are a list of Objects
+                if (action.is_array()) {
+                   no_error = app::handle_actions(event, action, key_values, bot);
+                }
+            }
+            if (command_data.contains("response") && no_error) {
                 response = command_data["response"];
                 std::cout << "Command: " << command_name << " → Response: " << response << std::endl;
-            } else {
-                std::cout << "No response found for command: " << command_name << std::endl;
             }
         }
 
