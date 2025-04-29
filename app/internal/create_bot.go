@@ -2,30 +2,26 @@ package internal
 
 import (
 	"fmt"
-	"net"
+	"log"
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
+
+	zmq "github.com/pebbe/zmq4"
 )
 
 type Bot struct {
-	BotID     string    `json:"bot_id"`
 	BotToken  string    `json:"bot_token"`
 	Cmd       *exec.Cmd // Ajouter une référence à la commande
-	processID int       // Stocker le PGID (Process Group ID)
+	processID int
+	dealer    *zmq.Socket // Stocker le PGID (Process Group ID)
+	read      bool
 }
 
-func Start(b *Bot) (net.Conn, error) {
-	socketPath := fmt.Sprintf("/tmp/%s.sock", b.BotID)
-
-	// Nettoyage préalable du socket
-	if err := os.RemoveAll(socketPath); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("error cleaning socket: %w", err)
-	}
+func Start(b *Bot, dealer *zmq.Socket) (*Bot, error) {
 
 	// Configuration du bot
-	cmd := exec.Command("./bot/build/discord-bot", b.BotToken)
+	cmd := exec.Command("../bot/build/discord-bot", b.BotToken)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true, // Permet de kill le processus enfant si nécessaire
 	}
@@ -39,23 +35,51 @@ func Start(b *Bot) (net.Conn, error) {
 	}
 	b.Cmd = cmd
 	b.processID = cmd.Process.Pid
-
-	// Mécanisme d'attente intelligente pour le socket
-	var conn net.Conn
-	maxRetries := 10
-	for i := 0; i < maxRetries; i++ {
-		var err error
-		conn, err = net.Dial("unix", socketPath)
-		if err == nil {
+	b.dealer = dealer
+	// Here we will receive messages from the bot in a separate goroutine
+	for {
+		msg, err := dealer.Recv(0)
+		if err != nil {
+			return nil, fmt.Errorf("[SERVER] failed to receive message: %w", err)
+		}
+		if msg == "ready" {
+			log.Printf("[SERVER] Bot is ready")
+			b.read = true
 			break
 		}
-		time.Sleep(500 * time.Millisecond)
+	}
+	return b, nil
+}
+
+func (b *Bot) Stop() error {
+	if b.Cmd != nil && b.processID != 0 {
+		if err := syscall.Kill(-b.processID, syscall.SIGTERM); err != nil {
+			return fmt.Errorf("[SERVER] failed to stop bot: %w", err)
+		}
+	}
+	return nil
+}
+
+func (b *Bot) SendMessage(message string) error {
+	if b.dealer == nil {
+		return fmt.Errorf("[SERVER] sender socket is not initialized")
+	}
+	if !b.read {
+		// Let's read the message before sending
+		msg, err := b.dealer.Recv(0)
+		if err != nil {
+			return fmt.Errorf("[SERVER] failed to receive message: %w", err)
+		}
+		log.Printf("[SERVER] received message: %s", msg)
+		b.read = true // Fix ici !
 	}
 
-	if conn == nil {
-		return nil, fmt.Errorf("failed to connect to bot socket after %d attempts", maxRetries)
+	_, err := b.dealer.Send(message, 0)
+	if err != nil {
+		return fmt.Errorf("[SERVER] failed to send message: %w", err)
 	}
+	log.Printf("[SERVER] sent message: %s", message)
 
-	fmt.Printf("Bot %s started successfully\n", b.BotID)
-	return conn, nil
+	b.read = false
+	return nil
 }

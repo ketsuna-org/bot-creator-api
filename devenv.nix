@@ -14,7 +14,11 @@
     openssl.dev  # Inclure les headers de développement
     zlib.dev
     libopus
+    libsodium
     pkg-config
+    zeromq
+    cppzmq
+    ninja
     (stdenv.mkDerivation {
         name = "dpp";
         version = "latest";
@@ -44,7 +48,8 @@
   '';
 
   scripts.start.exec = ''
-    go run app/cmd/main.go
+    cd app
+    go run cmd/main.go
   '';
 
   # Supprimer la configuration brew inutile dans Nix

@@ -1,11 +1,20 @@
 # Étape de compilation pour le programme Go
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.23 AS go-builder
+
 WORKDIR /app
+
 COPY app/ .
-RUN CGO_ENABLED=0 go build -o /api/app ./cmd/main.go
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libczmq-dev \
+    libzmq3-dev \
+    libsodium-dev
+
+RUN CGO_ENABLED=1 go build -o /api/app ./cmd/main.go
 
 # Étape de compilation pour le programme C++ avec DPP
-FROM ubuntu:24.04 AS cpp-builder
+FROM ubuntu:24.10 AS cpp-builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,7 +25,10 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     libopus-dev \
     clang \
-    pkg-config
+    pkg-config \
+    libczmq-dev \
+    libzmq3-dev \
+    libsodium-dev
 
 # Clone DPP
 RUN git clone https://github.com/brainboxdotcc/DPP.git /dpp && \
@@ -27,8 +39,7 @@ RUN git clone https://github.com/brainboxdotcc/DPP.git /dpp && \
 # Build DPP (shared)
 RUN mkdir -p /dpp/build && \
     cd /dpp/build && \
-    cmake .. \
-    -DDPP_BUILD_TEST=OFF && \
+    cmake .. -DDPP_BUILD_TEST=OFF && \
     make -j$(nproc) && \
     make install
 
@@ -43,11 +54,19 @@ RUN mkdir build && cd build && \
     make -j$(nproc)
 
 # Étape finale d'exécution
-FROM ubuntu:24.04
+FROM ubuntu:24.10
+
 WORKDIR /app
 
 # Install runtime deps
-RUN apt-get update && apt-get install -y libssl3 zlib1g libopus0 && apt-get clean
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    zlib1g \
+    libopus0 \
+    libsodium23 \
+    libzmq5 \
+    libczmq5 \
+    && apt-get clean
 
 # Copie des binaires
 COPY --from=go-builder /api ./api
@@ -57,7 +76,7 @@ COPY --from=cpp-builder /usr/local/lib/ /usr/local/lib/
 # Make sure executables are runnable
 RUN chmod +x ./api/app ./bot/build/discord-bot
 
-# Pour être sûr que libdpp.so soit trouvée
+# Pour être sûr que libdpp.so et libzmq.so soient trouvées
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 ENTRYPOINT ["./api/app"]
