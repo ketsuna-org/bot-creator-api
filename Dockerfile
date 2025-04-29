@@ -60,10 +60,8 @@ COPY --from=go-builder /api/app ./app
 COPY --from=cpp-builder /src/build/discord-bot ./discord-bot
 COPY --from=cpp-builder /usr/local/lib/ /usr/local/lib/
 
-# Make sure executables are runnable
 RUN chmod +x ./app ./discord-bot
 
-# Pour être sûr que libdpp.so soit trouvée
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 EXPOSE 2030
