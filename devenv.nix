@@ -17,6 +17,7 @@
     libsodium
     pkg-config
     ninja
+    gh
     (stdenv.mkDerivation {
         name = "dpp";
         version = "latest";
