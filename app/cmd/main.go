@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"syscall"
 
 	"github.com/ketsuna-org/bot-creator-api/internal"
-	zmq "github.com/pebbe/zmq4"
 )
 
 var botList = make(map[string]*internal.Bot)
@@ -28,34 +28,19 @@ func main() {
 		w.Write([]byte("Hello, World!"))
 	})
 
-	// Contexte ZeroMQ
-	ctx, err := zmq.NewContext()
-	if err != nil {
-		log.Fatalf("[SERVER] Failed to create context: %v", err)
-	}
-	defer ctx.Term()
-
-	// Socket dealer ZeroMQ
-	dealer, err := ctx.NewSocket(zmq.REP)
-	if err != nil {
-		log.Fatalf("[SERVER] Failed to create dealer: %v", err)
-	}
-	defer dealer.Close()
-
-	err = dealer.Bind("tcp://*:5555")
-	if err != nil {
-		log.Fatalf("[SERVER] Failed to bind dealer: %v", err)
-	}
-
 	// Route POST /create/{bot_token}
 	mux.HandleFunc("POST /create/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
 		// Extraire le token du bot de l'URL
-		botToken := r.URL.Query().Get("bot_token")
+		botToken := r.PathValue("bot_token")
+
+		// we need to retrieve the amount of bots running
 
 		bot := &internal.Bot{
-			BotToken: botToken,
+			BotToken:  botToken,
+			ProcessID: fmt.Sprint(len(botList) + 5555), // or any unique identifier
 		}
-		bot, err := internal.Start(bot, dealer)
+
+		bot, err := internal.Start(bot)
 		if err != nil {
 			log.Printf("[SERVER] Error starting bot: %v", err)
 			http.Error(w, "Error starting bot", http.StatusInternalServerError)
@@ -70,7 +55,7 @@ func main() {
 	// Route POST /stop/{bot_token}
 	mux.HandleFunc("POST /stop/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
 		// Extraire le token du bot de l'URL
-		botToken := r.URL.Query().Get("bot_token")
+		botToken := r.PathValue("bot_token")
 
 		bot, ok := botList[botToken]
 		if !ok {
@@ -91,7 +76,7 @@ func main() {
 	// Route POST /update/{bot_token}
 	mux.HandleFunc("POST /update/{bot_token}", func(w http.ResponseWriter, r *http.Request) {
 		// Extraire le token du bot de l'URL
-		botToken := r.URL.Query().Get("bot_token")
+		botToken := r.PathValue("bot_token")
 		bot, ok := botList[botToken]
 		if !ok {
 			http.Error(w, "Bot not found", http.StatusNotFound)

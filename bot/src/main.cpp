@@ -7,10 +7,13 @@
 int main(int argc, char *argv[]) {
     if (argc > 1) {
         std::string token = argv[1];
+        std::string port = argv[2];
         setenv("BOT_TOKEN", token.c_str(), 1);
+        setenv("PORT", port.c_str(), 1);
     }
 
     const std::string BOT_TOKEN = getenv("BOT_TOKEN");
+    const std::string PORT = getenv("PORT");
 
     dpp::cluster bot(BOT_TOKEN);
     std::unique_ptr<nlohmann::json> json_data = std::make_unique<nlohmann::json>();
@@ -36,13 +39,13 @@ int main(int argc, char *argv[]) {
         event.reply(app::update_string(response, key_values));
     });
 
-    bot.on_ready([&bot, &json_data](const dpp::ready_t &event) {
+    bot.on_ready([&bot, &json_data, &PORT](const dpp::ready_t &event) {
         if (dpp::run_once<struct register_bot_commands>()) {
             // Lancer la boucle ZMQ dans un thread séparé
-            std::thread zmq_thread([&json_data]() {
+            std::thread zmq_thread([&json_data, &PORT]() {
                 zmq::context_t ctx;
                 zmq::socket_t responder(ctx, zmq::socket_type::req);
-                responder.connect("tcp://localhost:5555");
+                responder.connect("tcp://localhost:" + PORT);
                 zmq::message_t ready_msg(5);
                 memcpy(ready_msg.data(), "ready", 5);
                 responder.send(ready_msg, zmq::send_flags::none);
