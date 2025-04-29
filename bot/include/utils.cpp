@@ -69,7 +69,7 @@ namespace app
     {
         std::unordered_map<std::string, std::string> key_values;
         const guild *g = event.command.is_guild_interaction() ? &event.command.get_guild() : nullptr;
-        const channel &c = event.command.get_channel();
+        const channel *channel_ptr = event.command.is_guild_interaction() ? &event.command.get_channel() : nullptr;
         const user &u = event.command.get_issuing_user();
         key_values["commandName"] = event.command.get_command_name();
         key_values["commandId"] = event.command.id.str();
@@ -78,9 +78,9 @@ namespace app
         key_values["userId"] = u.id.str();
         key_values["userAvatar"] = make_avatar_url(u);
         key_values["guildName"] = g ? g->name : "DM";
-        key_values["channelName"] = c.name;
-        key_values["channelId"] = c.id.str();
-        key_values["channelType"] = std::to_string(c.get_type());
+        key_values["channelName"] = channel_ptr ? channel_ptr->name : "DM";
+        key_values["channelId"] = channel_ptr ? channel_ptr->id.str() : "0";
+        key_values["channelType"] = channel_ptr ? std::to_string(channel_ptr->get_type()) : "0";
         key_values["guildId"] = g ? g->id.str() : "0";
         key_values["guildIcon"] = g ? make_guild_icon(*g) : "";
         key_values["guildCount"] = g ? std::to_string(g->member_count) : "0";
