@@ -16,8 +16,6 @@
     libopus
     libsodium
     pkg-config
-    zeromq
-    cppzmq
     ninja
     (stdenv.mkDerivation {
         name = "dpp";

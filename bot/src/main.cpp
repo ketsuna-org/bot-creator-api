@@ -1,15 +1,13 @@
 #include <dpp/dpp.h>
 #include <string>
-#include <zmq.hpp>
 #include "../include/utils.hpp"
+#include "../include/http_webhook_server.hpp"
 #include <thread>
 
-int main(int argc, char *argv[]) {
-    if (argc > 1) {
-        std::string token = argv[1];
-        std::string port = argv[2];
-        setenv("BOT_TOKEN", token.c_str(), 1);
-        setenv("PORT", port.c_str(), 1);
+int main(int argc, char* argv[]) {
+    if (argc > 2) {
+        setenv("BOT_TOKEN", argv[1], 1);
+        setenv("PORT", argv[2], 1);
     }
 
     const std::string BOT_TOKEN = getenv("BOT_TOKEN");
@@ -20,61 +18,63 @@ int main(int argc, char *argv[]) {
 
     bot.on_log(dpp::utility::cout_logger());
 
-    bot.on_slashcommand([&json_data](const dpp::slashcommand_t &event) {
+    bot.on_slashcommand([&json_data](const dpp::slashcommand_t& event) {
         std::unordered_map<std::string, std::string> key_values = app::generate_key_values(event);
+        std::string command_name = event.command.get_command_name();
         std::string response = "Interaction found, but no response found.";
-        if (event.command.get_command_name() != "") {
-            if (json_data->contains(event.command.get_command_name())) {
-                std::cout << "Command found: " << event.command.get_command_name() << std::endl;
-                auto command_data = json_data->at(event.command.get_command_name());
-                if (command_data.contains("response")) {
-                    std::cout << "Response found: " << command_data.at("response") << std::endl;
-                    response = command_data.at("response");
-                } else {
-                    std::cout << "Command data: " << command_data.dump(4) << std::endl;
-                    std::cout << "No response found for command: " << event.command.get_command_name() << std::endl;
-                }
+
+        if (!command_name.empty() && json_data->contains(command_name)) {
+            auto& command_data = (*json_data)[command_name];
+            if (command_data.contains("response")) {
+                response = command_data["response"];
+                std::cout << "Command: " << command_name << " → Response: " << response << std::endl;
+            } else {
+                std::cout << "No response found for command: " << command_name << std::endl;
             }
         }
+
         event.reply(app::update_string(response, key_values));
     });
 
-    bot.on_ready([&bot, &json_data, &PORT](const dpp::ready_t &event) {
+    bot.on_ready([&bot, &json_data, &PORT](const dpp::ready_t& event) {
         if (dpp::run_once<struct register_bot_commands>()) {
-            // Lancer la boucle ZMQ dans un thread séparé
-            std::thread zmq_thread([&json_data, &PORT]() {
-                zmq::context_t ctx;
-                zmq::socket_t responder(ctx, zmq::socket_type::req);
-                responder.connect("tcp://localhost:" + PORT);
-                zmq::message_t ready_msg(5);
-                memcpy(ready_msg.data(), "ready", 5);
-                responder.send(ready_msg, zmq::send_flags::none);
+            std::thread http_thread([&json_data, &PORT]() {
+                try {
+                    HttpWebhookServer server(std::stoi(PORT), [&json_data](const HttpWebhookServer::HttpRequest& req) {
+                        HttpWebhookServer::HttpResponse res;
 
-                while (true) {
-                    zmq::message_t reply;
-                    if (responder.recv(reply, zmq::recv_flags::none)) {
-                        std::string json_str(static_cast<char*>(reply.data()), reply.size());
-                        try {
-                            nlohmann::json j = app::json_from_string(json_str);
-                            if (j.contains("command")) {
-                                std::string command = j["command"];
-                                if (command == "update") {
-                                    json_data = std::make_unique<nlohmann::json>(j["data"]);
+                        if (req.method == "POST") {
+                            res.status_code = 200;
+                            res.headers["Content-Type"] = "application/json";
+
+                            try {
+                                nlohmann::json body_json = app::json_from_string(req.body);
+                                res.body = R"({"received": "POST request received"})";
+
+                                if (body_json.contains("command") && body_json["command"] == "update") {
+                                    json_data = std::make_unique<nlohmann::json>(body_json["data"]);
                                 }
+                            } catch (const std::exception& e) {
+                                res.status_code = 400;
+                                res.body = std::string("{\"error\": \"") + e.what() + "\"}";
                             }
-                            // Répondre de nouveau si nécessaire
-                            zmq::message_t ping(4);
-                            memcpy(ping.data(), "pong", 4);
-                            responder.send(ping, zmq::send_flags::none);
-                        } catch (const std::exception& e) {
-                            std::cerr << "[BOT] Error parsing JSON: " << e.what() << std::endl;
+                        } else {
+                            res.status_code = 400;
+                            res.headers["Content-Type"] = "text/plain";
+                            res.body = "Invalid request method.";
                         }
-                    }
-                }
 
+                        return res;
+                    });
+
+                    std::cout << "[BOT] Webhook server running on port " << PORT << "..." << std::endl;
+                    server.start();
+                } catch (const std::exception& e) {
+                    std::cerr << "[BOT] Server error: " << e.what() << std::endl;
+                }
             });
 
-            zmq_thread.detach(); // Le thread tourne en fond
+            http_thread.detach();
         }
     });
 

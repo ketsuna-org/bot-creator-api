@@ -2,12 +2,7 @@
 FROM golang:1.23 AS go-builder
 WORKDIR /app
 COPY app/ .
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libczmq-dev \
-    libzmq3-dev \
-    libsodium-dev
-RUN CGO_ENABLED=1 go build -o /api/app ./cmd/main.go
+RUN CGO_ENABLED=0 go build -o /api/app ./cmd/main.go
 
 # Étape de compilation pour le programme C++ avec DPP
 FROM ubuntu:24.04 AS cpp-builder
@@ -22,8 +17,6 @@ RUN apt-get update && apt-get install -y \
     libopus-dev \
     clang \
     pkg-config \
-    libczmq-dev \
-    libzmq3-dev \
     libsodium-dev
 
 # Clone DPP
@@ -60,7 +53,6 @@ RUN apt-get update && apt-get install -y \
     zlib1g \
     libopus0 \
     libsodium23 \
-    libzmq5 \
     && apt-get clean
 # Copie des binaires
 COPY --from=go-builder /api/app ./app

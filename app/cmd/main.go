@@ -40,7 +40,37 @@ func main() {
 			ProcessID: fmt.Sprint(len(botList) + 5555), // or any unique identifier
 		}
 
-		bot, err := internal.Start(bot)
+		// Let's check if this discord bot exists
+		if _, ok := botList[botToken]; ok {
+			log.Printf("[SERVER] Bot already running: %s", botToken)
+			http.Error(w, "Bot already running", http.StatusConflict)
+			return
+		}
+
+		// let's check if it exist on Discord
+		httpClient := &http.Client{}
+		req, err := http.NewRequest("GET", "https://discord.com/api/v10/users/@me", nil)
+		if err != nil {
+			log.Printf("[SERVER] Error creating request: %v", err)
+			http.Error(w, "Error creating request", http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("Authorization", "Bot "+botToken)
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			log.Printf("[SERVER] Error sending request: %v", err)
+			http.Error(w, "Error sending request", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("[SERVER] Bot not found: %s", botToken)
+			http.Error(w, "Bot not found", http.StatusNotFound)
+			return
+		}
+		// let's check if the bot is already running
+
+		bot, err = internal.Start(bot)
 		if err != nil {
 			log.Printf("[SERVER] Error starting bot: %v", err)
 			http.Error(w, "Error starting bot", http.StatusInternalServerError)
