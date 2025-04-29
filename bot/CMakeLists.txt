@@ -29,7 +29,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenSSL::Crypto
     z
     opus
-    zmq
 )
 
 # Include directories
