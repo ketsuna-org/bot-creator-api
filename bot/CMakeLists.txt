@@ -11,7 +11,7 @@ find_package(dpp REQUIRED
     HINTS ${DPP_INCLUDE_DIR}  # Add path if needed: /nix/store/.../include
 )
 file(GLOB_RECURSE SRC_FILES
-    include/*.cpp
+    src/*.cpp
     include/*.hpp
 )
 # Add executable

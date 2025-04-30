@@ -2,6 +2,7 @@
 #include <string>
 #include "../include/utils.hpp"
 #include "../include/http_webhook_server.hpp"
+#include "../include/handle_actions.hpp"
 #include <thread>
 
 int main(int argc, char* argv[]) {
@@ -18,22 +19,34 @@ int main(int argc, char* argv[]) {
 
     bot.on_log(dpp::utility::cout_logger());
 
-    bot.on_slashcommand([&json_data, &bot](const dpp::slashcommand_t& event) {
+    bot.on_slashcommand([&json_data, &bot](const dpp::slashcommand_t& event) -> dpp::task<void> {
         std::unordered_map<std::string, std::string> key_values = app::generate_key_values(event);
         std::string command_name = event.command.get_command_name();
         std::string response = "Interaction found, but no response found.";
 
         if (!command_name.empty() && json_data->contains(command_name)) {
             auto& command_data = (*json_data)[command_name];
-            bool no_error = true;
-            if (command_data.contains("action")) {
-                auto& action = command_data["action"];
+            if (command_data.contains("actions")) {
+                auto& action = command_data["actions"];
                 // Actions are a list of Objects
                 if (action.is_array()) {
-                   no_error = app::handle_actions(event, action, key_values, bot);
+                    std::cout << "Executing → Actions: " << action.dump() << std::endl;
+                    auto already_returned_message = co_await handle_actions(event, action, key_values);
+                    if(!already_returned_message) {
+                        std::cout << "Command: " << command_name << " → Action: " << action.dump() << std::endl;
+                        co_return;
+                    }else {
+                        // This mean we need to edit the response, not reply
+                        if(command_data.contains("response")) {
+                            response = command_data["response"];
+                            std::cout << "Command: " << command_name << " → Response: " << response << std::endl;
+                        }
+                        event.edit_response(app::update_string(response, key_values));
+                        co_return;
+                    }
                 }
             }
-            if (command_data.contains("response") && no_error) {
+            if (command_data.contains("response")) {
                 response = command_data["response"];
                 std::cout << "Command: " << command_name << " → Response: " << response << std::endl;
             }

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <functional>

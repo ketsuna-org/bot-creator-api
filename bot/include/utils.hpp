@@ -1,5 +1,5 @@
 // utils.hpp
-
+#pragma once
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
@@ -63,7 +63,7 @@ namespace app
      * @param actions The JSON object containing actions to be handled
      * @param key_values The map of key-value pairs to be used in the actions
      */
-    bool handle_actions(const slashcommand_t &event, const nlohmann::json &actions, const std::unordered_map<std::string, std::string> &key_values, dpp::cluster &bot);
+    bool handle_actions(const slashcommand_t &event, const nlohmann::json &actions, const std::unordered_map<std::string, std::string> &key_values);
 
     /**
      * @brief Parses a JSON string into a JSON object
