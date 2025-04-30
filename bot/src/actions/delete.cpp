@@ -102,4 +102,6 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
             }
         }
     }
+
+    co_return true;
 }
