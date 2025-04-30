@@ -17,13 +17,15 @@ dpp::task<bool> handle_actions(const dpp::slashcommand_t &event, const nlohmann:
                 std::string action_type = action["type"];
                 if (action_type == "delete_messages" && event.command.is_guild_interaction())
                 {
-                   co_await thinking;
                    auto return_value = co_await delete_action(event, action, key_values, user_ptr, cluster);
+                   co_await thinking;
                    // if it's a false, we need to return false !
                      if (!return_value)
                      {
                           co_return false;
                      }
+
+
                 }
             }
             if (i == actions.size())

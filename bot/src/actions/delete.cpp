@@ -27,10 +27,14 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
     }
     // let's retrieve the current channel
     const dpp::channel *channel_ptr = &event.command.get_channel();
-
-    // let's check if the user has permission to delete messages
-    if (!channel_ptr->get_user_permissions(member_ptr).has(dpp::p_manage_messages) &&
-        !channel_ptr->get_user_permissions(bot_member_ptr).has(dpp::p_manage_messages))
+    auto user_as_perms = channel_ptr->get_user_permissions(member_ptr).has(dpp::p_manage_messages);
+    auto bot_as_perms = channel_ptr->get_user_permissions(bot_member_ptr).has(dpp::p_manage_messages);
+    if (!user_as_perms)
+    {
+        event.edit_response(error_messages["error_perm_channel"]);
+        co_return false;
+    }
+    if (!bot_as_perms)
     {
         event.edit_response(error_messages["error_perm_channel"]);
         co_return false;
