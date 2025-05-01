@@ -1,0 +1,30 @@
+# Fichier de traduction pour les messages d'erreur de suppression de messages
+msgid ""
+msgstr ""
+"Project-Id-Version: Discord Bot Actions\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-05-01 15:32+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: Everbloo Dev Team <dev@everbloo.fr>\n"
+"Language-Team: French <fr@everbloo.fr>\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: (emplacement original dans le code)
+msgid "No messages to delete."
+msgstr ""
+
+#:
+msgid "You need to wait a bit before deleting messages."
+msgstr ""
+
+#:
+msgid "The amount of messages to delete must be between 1 and 100."
+msgstr ""
+
+#:
+msgid "You do not have permission to delete messages in this channel."
+msgstr ""
