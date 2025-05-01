@@ -1,8 +1,6 @@
-#include <dpp/dpp.h>
 #include "../include/actions/delete.hpp"
 dpp::task<bool> handle_actions(const dpp::slashcommand_t &event, const nlohmann::json &actions, const std::unordered_map<std::string, std::string> &key_values)
 {
-
     dpp::cluster *cluster = event.owner;
     dpp::user user_ptr = event.command.get_issuing_user();
     dpp::async thinking = event.co_thinking(false);
@@ -36,4 +34,6 @@ dpp::task<bool> handle_actions(const dpp::slashcommand_t &event, const nlohmann:
             }
         }
     }
+    co_await thinking;
+    co_return true;
 }

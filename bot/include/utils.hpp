@@ -11,6 +11,9 @@
 #include <sstream>
 #include <algorithm>
 using namespace dpp;
+
+enum class Lang { en, fr };
+
 namespace app
 {
 
@@ -80,6 +83,25 @@ namespace app
      * @return std::string The string representation of the JSON object
      */
     std::string string_from_json(const nlohmann::json &j);
+
+    /**
+     * @brief Gets the available locale for a given locale string
+     *
+     * @param locale The locale string to check
+     * @return std::string The available locale or "en" if not found
+     */
+     std::string get_available_locale(std::string locale);
+
+    /**
+    * @brienf translate a string from a locale, optionnal parameters and a default value
+    * @param str The string to translate to found in an Array of translations
+    * @param locale The locale to use for translation
+    * @param array_translations The array of translations
+    * @param args The optional parameters to replace in the string
+    * @return std::string The translated string
+    */
+    std::string translate(const std::string &str, const std::string &locale, const std::map<Lang, std::map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args = {});
+
 
 } // namespace dpp
 

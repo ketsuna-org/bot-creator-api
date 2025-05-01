@@ -1,9 +1,27 @@
-#include <dpp/dpp.h>
+#include "../../include/utils.hpp"
+
+
+const std::map<Lang, std::map<std::string, std::string>> error_messages_map = {
+    {Lang::en, {
+        {"error_no_messages", "No message to delete."},
+        {"error", "You need to wait a bit before deleting messages."},
+        {"error_amount", "The amount of messages to delete must be between 1 and 100."},
+        {"error_perm_channel", "You do not have permission to delete messages in this channel."}
+    }},
+    {Lang::fr, {
+        {"error_no_messages", "Aucun message à supprimer."},
+        {"error", "Vous devez attendre un peu avant de supprimer des messages."},
+        {"error_amount", "Le nombre de messages à supprimer doit être compris entre 1 et 100."},
+        {"error_perm_channel", "Vous n'avez pas la permission de supprimer des messages dans ce canal."}
+    }}
+};
 
 dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::json &action,
                               const std::unordered_map<std::string, std::string> &key_values,
                               dpp::user &user_ptr, dpp::cluster *cluster)
 {
+    // setup locale for gettext
+    std::string locale = app::get_available_locale(event.command.locale);
     const dpp::channel *channel_ptr = &event.command.get_channel();
     const auto &guild_ptr = event.command.get_guild();
 
@@ -13,13 +31,14 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
     const auto bot_member_it = guild_ptr.members.find(cluster->me.id);
     const auto *bot_member_ptr = (bot_member_it != guild_ptr.members.end()) ? &bot_member_it->second : nullptr;
 
-    const std::unordered_map<std::string, std::string> error_messages = [&action]()
+    const std::unordered_map<std::string, std::string> error_messages = [&action,&locale]()
     {
         std::unordered_map<std::string, std::string> defaults = {
-            {"error_no_messages", "No messages to delete."},
-            {"error", "You need to wait a bit before deleting messages."},
-            {"error_amount", "The amount of messages to delete must be between 1 and 100."},
-            {"error_perm_channel", "You do not have permission to delete messages in this channel."}};
+            {"error_no_messages", app::translate("error_no_messages", locale, error_messages_map)},
+            {"error", app::translate("error", locale, error_messages_map)},
+            {"error_amount", app::translate("error_amount", locale, error_messages_map)},
+            {"error_perm_channel", app::translate("error_perm_channel", locale, error_messages_map)},
+        };
         if (action.contains("error_amount"))
             defaults["error_amount"] = action["error_amount"];
         if (action.contains("error_perm_channel"))

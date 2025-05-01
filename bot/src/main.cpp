@@ -1,5 +1,3 @@
-#include <dpp/dpp.h>
-#include <string>
 #include "../include/utils.hpp"
 #include "../include/http_webhook_server.hpp"
 #include "../include/handle_actions.hpp"
