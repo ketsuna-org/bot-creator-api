@@ -16,6 +16,7 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
     const std::unordered_map<std::string, std::string> error_messages = [&action]()
     {
         std::unordered_map<std::string, std::string> defaults = {
+            {"error_no_messages", "No messages to delete."},
             {"error", "You need to wait a bit before deleting messages."},
             {"error_amount", "The amount of messages to delete must be between 1 and 100."},
             {"error_perm_channel", "You do not have permission to delete messages in this channel."}};
@@ -78,7 +79,7 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
         const auto &messages = callback.get<dpp::message_map>();
         if (messages.empty())
         {
-            event.edit_response("No messages to delete.");
+            event.edit_response(error_messages.at("error_no_messages"));
             co_return false;
         }
 
