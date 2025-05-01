@@ -1,5 +1,5 @@
 {
-    "cmake.sourceDirectory": "/home/exa/perso/bot-creator-api/bot",
+    "cmake.sourceDirectory": "/Users/jeremy/Documents/bot-creator-api/bot",
     "files.associations": {
         "map": "cpp",
         "__bit_reference": "cpp",
