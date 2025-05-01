@@ -12,7 +12,10 @@
 #include <algorithm>
 using namespace dpp;
 
-enum class Lang { en, fr };
+enum class Lang {
+    en,
+    fr,
+};
 
 namespace app
 {
@@ -90,7 +93,7 @@ namespace app
      * @param locale The locale string to check
      * @return std::string The available locale or "en" if not found
      */
-     std::string get_available_locale(std::string locale);
+     Lang get_available_locale(std::string locale);
 
     /**
     * @brienf translate a string from a locale, optionnal parameters and a default value

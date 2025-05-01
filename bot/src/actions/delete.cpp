@@ -21,7 +21,7 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
                               dpp::user &user_ptr, dpp::cluster *cluster)
 {
     // setup locale for gettext
-    std::string locale = app::get_available_locale(event.command.locale);
+    std::string locale = event.command.locale;
     const dpp::channel *channel_ptr = &event.command.get_channel();
     const auto &guild_ptr = event.command.get_guild();
 

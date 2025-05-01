@@ -207,25 +207,21 @@ namespace app
         return str;
     }
 
-    std::string get_available_locale(std::string locale)
+    Lang get_available_locale(std::string locale)
     {
-        std::vector<std::string> available_locales = {"en", "fr"};
-        std::string lang = locale.substr(0, 2);
-        std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
-        if (std::find(available_locales.begin(), available_locales.end(), lang) != available_locales.end())
-        {
-            return lang;
-        }
+        std::transform(locale.begin(), locale.end(), locale.begin(), ::tolower);
+        if (locale == "fr" || locale == "fr-fr")
+            return Lang::fr;
+        else if (locale == "en" || locale == "en-us")
+            return Lang::en;
         else
-        {
-            return "en"; // Default to English if not found
-        }
+            return Lang::en; // Default to English if no match is found
     }
 
     std::string translate(const std::string &str, const std::string &locale, const std::map<Lang, std::map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args)
     {
-        std::string lang = get_available_locale(locale);
-        auto it = array_translations.find(Lang::en);
+        Lang lang = get_available_locale(locale);
+        auto it = array_translations.find(lang);
         if (it != array_translations.end())
         {
             auto it2 = it->second.find(str);
