@@ -18,7 +18,7 @@ dpp::activity_type activity_type_from_string(const std::string& type) {
     } else if (type == "competing") {
         return dpp::activity_type::at_competing;
     } else {
-        throw std::invalid_argument("Invalid activity type");
+        return dpp::activity_type::at_game; // Default to "playing" if the type is unknown
     }
 }
 
