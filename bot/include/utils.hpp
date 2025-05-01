@@ -1,7 +1,5 @@
 // utils.hpp
 #pragma once
-#ifndef UTILS_HPP
-#define UTILS_HPP
 
 #include <dpp/dpp.h>
 #include <dpp/nlohmann/json.hpp>
@@ -103,10 +101,9 @@ namespace app
     * @param args The optional parameters to replace in the string
     * @return std::string The translated string
     */
-    std::string translate(const std::string &str, const std::string &locale, const std::map<Lang, std::map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args = {});
+    std::string translate(const std::string &str, const std::string &locale, const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args = {});
 
 
 } // namespace dpp
 
-#endif // UTILS_HPP
 // utils.hpp

@@ -218,7 +218,7 @@ namespace app
             return Lang::en; // Default to English if no match is found
     }
 
-    std::string translate(const std::string &str, const std::string &locale, const std::map<Lang, std::map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args)
+    std::string translate(const std::string &str, const std::string &locale, const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args)
     {
         Lang lang = get_available_locale(locale);
         auto it = array_translations.find(lang);

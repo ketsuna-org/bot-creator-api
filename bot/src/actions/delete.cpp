@@ -1,7 +1,7 @@
 #include "../../include/utils.hpp"
 
 
-const std::map<Lang, std::map<std::string, std::string>> error_messages_map = {
+const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> error_messages_map = {
     {Lang::en, {
         {"error_no_messages", "No message to delete."},
         {"error", "You need to wait a bit before deleting messages."},
