@@ -10,7 +10,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(dpp REQUIRED
     HINTS ${DPP_INCLUDE_DIR}  # Add path if needed: /nix/store/.../include
 )
-find_package(Gettext REQUIRED)
 file(GLOB_RECURSE SRC_FILES
     src/*.cpp
     include/*.hpp
