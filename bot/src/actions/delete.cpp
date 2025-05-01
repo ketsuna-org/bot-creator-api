@@ -13,12 +13,6 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
     const auto bot_member_it = guild_ptr.members.find(cluster->me.id);
     const auto *bot_member_ptr = (bot_member_it != guild_ptr.members.end()) ? &bot_member_it->second : nullptr;
 
-    if (!member_ptr || !bot_member_ptr)
-    {
-        event.edit_response("Member lookup failed");
-        co_return false;
-    }
-
     const std::unordered_map<std::string, std::string> error_messages = [&action]()
     {
         std::unordered_map<std::string, std::string> defaults = {
@@ -33,6 +27,12 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
             defaults["error"] = action["error"];
         return defaults;
     }();
+
+    if (!member_ptr || !bot_member_ptr)
+    {
+        event.edit_response(error_messages.at("error_perm_channel"));
+        co_return false;
+    }
 
     const bool has_permissions = channel_ptr->get_user_permissions(*member_ptr).has(dpp::p_manage_messages) && channel_ptr->get_user_permissions(*bot_member_ptr).has(dpp::p_manage_messages);
     if (!has_permissions)
@@ -58,7 +58,7 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
             }
             catch (const std::exception &e)
             {
-                event.edit_response("Invalid message count format");
+                event.edit_response(error_messages.at("error"));
                 co_return false;
             }
         }
