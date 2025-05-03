@@ -3,6 +3,15 @@
 #include <unistd.h>
 #include <cstring>
 #include <algorithm>
+#include <sstream>
+#include <stdexcept>
+#include <system_error>
+
+#ifdef __linux__
+#include <sys/epoll.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
+#endif
 
 HttpWebhookServer::HttpWebhookServer(uint16_t port, Handler handler)
     : port(port), request_handler(handler) {
@@ -17,11 +26,15 @@ HttpWebhookServer::~HttpWebhookServer() {
 }
 
 void HttpWebhookServer::setupSocket() {
-    server_fd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (server_fd == -1) throw std::system_error(errno, std::generic_category());
+    server_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1)
+        throw std::system_error(errno, std::generic_category());
 
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    if (::fcntl(server_fd, F_SETFL, O_NONBLOCK) == -1)
+        throw std::system_error(errno, std::generic_category());
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -36,6 +49,7 @@ void HttpWebhookServer::setupSocket() {
 }
 
 void HttpWebhookServer::setupEpoll() {
+#ifdef __linux__
     epoll_fd = ::epoll_create1(0);
     if (epoll_fd == -1)
         throw std::system_error(errno, std::generic_category());
@@ -46,33 +60,96 @@ void HttpWebhookServer::setupEpoll() {
 
     if (::epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event) == -1)
         throw std::system_error(errno, std::generic_category());
+
+#elif defined(__APPLE__)
+    epoll_fd = ::kqueue();
+    if (epoll_fd == -1)
+        throw std::system_error(errno, std::generic_category());
+
+    struct kevent ev_set;
+    EV_SET(&ev_set, server_fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+    if (kevent(epoll_fd, &ev_set, 1, nullptr, 0, nullptr) == -1)
+        throw std::system_error(errno, std::generic_category());
+#endif
+}
+
+void HttpWebhookServer::registerFdForRead(int fd) {
+#ifdef __linux__
+    epoll_event event{};
+    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+    event.data.fd = fd;
+    ::epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
+#elif defined(__APPLE__)
+    struct kevent ev_set;
+    EV_SET(&ev_set, fd, EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+    kevent(epoll_fd, &ev_set, 1, nullptr, 0, nullptr);
+#endif
+}
+
+void HttpWebhookServer::modifyFdToWrite(int fd) {
+#ifdef __linux__
+    epoll_event event{};
+    event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
+    event.data.fd = fd;
+    ::epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event);
+#elif defined(__APPLE__)
+    struct kevent ev_set[2];
+    EV_SET(&ev_set[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+    EV_SET(&ev_set[1], fd, EVFILT_WRITE, EV_ADD | EV_CLEAR, 0, 0, nullptr);
+    kevent(epoll_fd, ev_set, 2, nullptr, 0, nullptr);
+#endif
 }
 
 void HttpWebhookServer::start() {
     running = true;
+
+#ifdef __linux__
     epoll_event events[64];
+#elif defined(__APPLE__)
+    struct kevent events[64];
+#endif
 
     while (running) {
+#ifdef __linux__
         int nfds = ::epoll_wait(epoll_fd, events, 64, -1);
+#elif defined(__APPLE__)
+        int nfds = ::kevent(epoll_fd, nullptr, 0, events, 64, nullptr);
+#endif
         if (nfds == -1 && errno != EINTR)
             throw std::system_error(errno, std::generic_category());
 
         for (int i = 0; i < nfds; ++i) {
-            if (events[i].data.fd == server_fd) {
+#ifdef __linux__
+            int fd = events[i].data.fd;
+            bool isWritable = events[i].events & EPOLLOUT;
+#elif defined(__APPLE__)
+            int fd = static_cast<int>(events[i].ident);
+            bool isWritable = events[i].filter == EVFILT_WRITE;
+#endif
+
+            if (fd == server_fd) {
                 while (true) {
                     sockaddr_in client_addr{};
                     socklen_t client_len = sizeof(client_addr);
+
+#ifdef __linux__
                     int client_fd = ::accept4(server_fd, (sockaddr*)&client_addr, &client_len, SOCK_NONBLOCK);
+#elif defined(__APPLE__)
+                    int client_fd = ::accept(server_fd, (sockaddr*)&client_addr, &client_len);
+                    if (client_fd != -1) {
+                        int flags = fcntl(client_fd, F_GETFL, 0);
+                        fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+                    }
+#endif
                     if (client_fd == -1) break;
 
-                    epoll_event event{};
-                    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-                    event.data.fd = client_fd;
-                    ::epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event);
                     clients[client_fd] = ClientContext{};
+                    registerFdForRead(client_fd);
                 }
+            } else if (isWritable) {
+                sendToClient(fd);
             } else {
-                handleClient(events[i].data.fd);
+                handleClient(fd);
             }
         }
     }
@@ -83,9 +160,33 @@ void HttpWebhookServer::stop() {
 }
 
 void HttpWebhookServer::closeClient(int fd) {
+#ifdef __linux__
     ::epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr);
+#elif defined(__APPLE__)
+    struct kevent ev_del[2];
+    EV_SET(&ev_del[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
+    EV_SET(&ev_del[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, nullptr);
+    kevent(epoll_fd, ev_del, 2, nullptr, 0, nullptr);
+#endif
     ::close(fd);
     clients.erase(fd);
+}
+
+void HttpWebhookServer::sendToClient(int fd) {
+    if (!clients.count(fd)) return;
+
+    auto& ctx = clients[fd];
+    if (!ctx.output_buffer.empty()) {
+        ssize_t sent = ::send(fd,
+                              ctx.output_buffer.data() + ctx.bytes_written,
+                              ctx.output_buffer.size() - ctx.bytes_written,
+                              MSG_DONTWAIT);
+
+        if (sent > 0) ctx.bytes_written += sent;
+        if (ctx.bytes_written == ctx.output_buffer.size()) {
+            closeClient(fd);
+        }
+    }
 }
 
 void HttpWebhookServer::handleClient(int fd) {
@@ -103,30 +204,11 @@ void HttpWebhookServer::handleClient(int fd) {
             HttpResponse res = request_handler(req);
             buildHttpResponse(res, ctx.output_buffer);
 
-            epoll_event event{};
-            event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
-            event.data.fd = fd;
-            ::epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event);
+            modifyFdToWrite(fd);
         }
-    }
-    else if (count == 0 || (count == -1 && errno != EAGAIN)) {
+    } else if (count == 0 || (count == -1 && errno != EAGAIN)) {
         closeClient(fd);
         return;
-    }
-
-    if (!clients.count(fd)) return; // Client déjà fermé plus haut
-
-    auto& ctx = clients[fd];
-    if (!ctx.output_buffer.empty()) {
-        ssize_t sent = ::send(fd,
-                              ctx.output_buffer.data() + ctx.bytes_written,
-                              ctx.output_buffer.size() - ctx.bytes_written,
-                              MSG_DONTWAIT);
-
-        if (sent > 0) ctx.bytes_written += sent;
-        if (ctx.bytes_written == ctx.output_buffer.size()) {
-            closeClient(fd);
-        }
     }
 }
 

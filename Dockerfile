@@ -41,7 +41,7 @@ RUN mkdir build && cd build && \
     cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH=/usr/local && \
-    make -j$(nproc)
+    make -j2
 
 # Étape finale d'exécution
 FROM ubuntu:24.04

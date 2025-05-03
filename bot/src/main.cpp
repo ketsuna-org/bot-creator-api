@@ -1,5 +1,3 @@
-#include <dpp/dpp.h>
-#include <string>
 #include "../include/utils.hpp"
 #include "../include/http_webhook_server.hpp"
 #include "../include/handle_actions.hpp"
@@ -20,7 +18,7 @@ dpp::activity_type activity_type_from_string(const std::string& type) {
     } else if (type == "competing") {
         return dpp::activity_type::at_competing;
     } else {
-        throw std::invalid_argument("Invalid activity type");
+        return dpp::activity_type::at_game; // Default to "playing" if the type is unknown
     }
 }
 
