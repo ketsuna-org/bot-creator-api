@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,13 +10,44 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/arangodb/go-driver/v2/arangodb"
+	"github.com/arangodb/go-driver/v2/connection"
 	"github.com/ketsuna-org/bot-creator-api/internal"
 )
 
 var botList = make(map[string]*internal.Bot)
+var database arangodb.Database
 
 func init() {
 	// Initialisation de l'application
+	password := os.Getenv("DB_PASSWORD")
+	user := os.Getenv("DB_USERNAME")
+	host := os.Getenv("DB_HOST")
+	dbName := os.Getenv("DB_NAME")
+	if password == "" || user == "" || host == "" || dbName == "" {
+		// display which env variable is missing
+		array := []string{"DB_PASSWORD", "DB_USERNAME", "DB_HOST", "DB_NAME"}
+		for _, v := range array {
+			if os.Getenv(v) == "" {
+				log.Printf("[SERVER] %s is missing", v)
+			}
+		}
+	}
+
+	// Connexion à la base de données
+	conn := arangodb.NewClient(connection.NewHttp2Connection(connection.Http2Configuration{
+		Endpoint: connection.NewRoundRobinEndpoints([]string{
+			fmt.Sprintf("https://%s", host),
+		}),
+		Authentication: connection.NewBasicAuth(user, password),
+	}))
+
+	db, err := conn.GetDatabase(context.Background(), dbName, nil)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+
+	database = db
 }
 
 func main() {
@@ -39,6 +71,15 @@ func main() {
 			BotToken:  botToken,
 			ProcessID: fmt.Sprint(len(botList) + 5555), // or any unique identifier
 		}
+
+		// let's start the bot
+		col, err := database.GetCollection(context.Background(), "bots", nil)
+		if err != nil {
+			log.Printf("[SERVER] Error getting collection: %v", err)
+			http.Error(w, "Error getting collection", http.StatusInternalServerError)
+			return
+		}
+		// let's check if the bot already exists
 
 		// Let's check if this discord bot exists
 		if _, ok := botList[botToken]; ok {
@@ -68,6 +109,42 @@ func main() {
 			http.Error(w, "Bot not found", http.StatusNotFound)
 			return
 		}
+
+		var botData map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&botData); err != nil {
+			log.Printf("[SERVER] Error decoding JSON: %v", err)
+			http.Error(w, "Error decoding JSON", http.StatusInternalServerError)
+			return
+		}
+
+		botData["_key"] = botData["id"]
+		id := botData["id"].(string)
+		botData["token"] = botToken
+		exist, err := col.DocumentExists(context.Background(), id)
+		if err != nil {
+			log.Printf("[SERVER] Error checking document: %v", err)
+			http.Error(w, "Error checking document", http.StatusInternalServerError)
+			return
+		}
+
+		if !exist { // let's create the bot
+			_, err = col.CreateDocument(context.Background(), botData)
+			if err != nil {
+				log.Printf("[SERVER] Error creating bot: %v", err)
+				http.Error(w, "Error creating document", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("[SERVER] Bot created: %s", botToken)
+		} else {
+			// let's update the bot
+			_, err = col.UpdateDocument(context.Background(), botData["id"].(string), botData)
+			if err != nil {
+				log.Printf("[SERVER] Error updating document: %v", err)
+				http.Error(w, "Error updating document", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("[SERVER] Bot updated: %s", botToken)
+		}
 		// let's check if the bot is already running
 		// let's parse the body.
 		var body map[string]interface{}
@@ -86,6 +163,108 @@ func main() {
 			// data are the default ones we can set the default ones
 			fmt.Printf("[SERVER] No data found, setting default ones")
 			body["data"] = map[string]interface{}{}
+		} else {
+			// let's create each commands associated with the bot, and it's corresponding commands ID
+			// let's check if the data is a map
+			dataToUse, ok := body["data"].(map[string]interface{})
+			if !ok {
+				log.Printf("[SERVER] Data is not a map")
+				http.Error(w, "Data is not a map", http.StatusBadRequest)
+				return
+			}
+			// let's check if the data is a map
+			// each command is a key. and the value is a map
+			for key, value := range dataToUse {
+				// let's check if the value is a map
+				valueToUse, ok := value.(map[string]interface{})
+				if !ok {
+					log.Printf("[SERVER] Value is not a map")
+					http.Error(w, "Value is not a map", http.StatusBadRequest)
+					return
+				}
+
+				valueToUse["_key"] = key
+
+				col, err := database.GetCollection(context.Background(), "commands", nil)
+				// let's check if the name is set
+				if err != nil {
+					log.Printf("[SERVER] Error getting collection: %v", err)
+					http.Error(w, "Error getting collection", http.StatusInternalServerError)
+					return
+				}
+
+				// first check if the command already exists
+				exist, err := col.DocumentExists(context.Background(), key)
+				if err != nil {
+					log.Printf("[SERVER] Error checking document: %v", err)
+					http.Error(w, "Error checking document", http.StatusInternalServerError)
+					return
+				}
+				if !exist {
+					// this mean we can create the command
+					// let's create the command
+					_, err = col.CreateDocument(context.Background(), valueToUse)
+					if err != nil {
+						log.Printf("[SERVER] Error creating document: %v", err)
+						http.Error(w, "Error creating document", http.StatusInternalServerError)
+						return
+					}
+					log.Printf("[SERVER] Command created: %s", key)
+				} else {
+					// let's update the command
+					_, err = col.UpdateDocument(context.Background(), key, valueToUse)
+					if err != nil {
+						log.Printf("[SERVER] Error updating document: %v", err)
+						http.Error(w, "Error updating document", http.StatusInternalServerError)
+						return
+					}
+					log.Printf("[SERVER] Command updated: %s", key)
+				}
+
+				// let's create edge or update the edge
+				edgeCol, err := database.GetCollection(context.Background(), "bots_commands", nil)
+				if err != nil {
+					log.Printf("[SERVER] Error getting collection: %v", err)
+					http.Error(w, "Error getting collection", http.StatusInternalServerError)
+					return
+				}
+				// let's check if the edge already exists
+				edgeID := fmt.Sprintf("%s_%s", id, key)
+				exist, err = edgeCol.DocumentExists(context.Background(), edgeID)
+				if err != nil {
+					log.Printf("[SERVER] Error checking document: %v", err)
+					http.Error(w, "Error checking document", http.StatusInternalServerError)
+					return
+				}
+
+				if !exist {
+					edge := map[string]interface{}{
+						"_from": "bots/" + id,
+						"_to":   "commands/" + key,
+						"_key":  edgeID,
+					}
+					_, err = edgeCol.CreateDocument(context.Background(), edge)
+					if err != nil {
+						log.Printf("[SERVER] Error creating document: %v", err)
+						http.Error(w, "Error creating document", http.StatusInternalServerError)
+						return
+					}
+					log.Printf("[SERVER] Edge created: %s", edgeID)
+				} else {
+					// let's update the edge
+					edge := map[string]interface{}{
+						"_from": "bots/" + id,
+						"_to":   "commands/" + key,
+					}
+					_, err = edgeCol.UpdateDocument(context.Background(), edgeID, edge)
+					if err != nil {
+						log.Printf("[SERVER] Error updating document: %v", err)
+						http.Error(w, "Error updating document", http.StatusInternalServerError)
+						return
+					}
+					log.Printf("[SERVER] Edge updated: %s", edgeID)
+				}
+			}
 		}
 
 		// let's convert the data to a string

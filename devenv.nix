@@ -1,6 +1,7 @@
 { pkgs, lib, config, inputs, ... }:
 
 {
+    dotenv.enable = true;
   env = {
     CXXFLAGS = "-std=c++20";
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig"; # Critical pour trouver OpenSSL
