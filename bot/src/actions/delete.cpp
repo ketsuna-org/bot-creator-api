@@ -1,4 +1,5 @@
 #include "../../include/utils.hpp"
+#include <unordered_map>
 
 
 const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> error_messages_map = {
@@ -16,7 +17,7 @@ const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> err
     }}
 };
 
-dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::json &action,
+dpp::task<std::unordered_map<std::string, std::string>> delete_action(const dpp::slashcommand_t &event, const nlohmann::json &action,
                               const std::unordered_map<std::string, std::string> &key_values,
                               dpp::user &user_ptr, dpp::cluster *cluster)
 {
@@ -51,14 +52,14 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
     if (!member_ptr || !bot_member_ptr)
     {
         event.edit_response(error_messages.at("error_perm_channel"));
-        co_return false;
+        co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error_perm_channel")}};
     }
 
     const bool has_permissions = channel_ptr->get_user_permissions(*member_ptr).has(dpp::p_manage_messages) && channel_ptr->get_user_permissions(*bot_member_ptr).has(dpp::p_manage_messages);
     if (!has_permissions)
     {
         event.edit_response(error_messages.at("error_perm_channel"));
-        co_return false;
+        co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error_perm_channel")}};
     }
 
     int amount = 0;
@@ -73,13 +74,13 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
                 if (amount < 1 || amount > 100)
                 {
                     event.edit_response(error_messages.at("error_amount"));
-                    co_return false;
+                    co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error_amount")}};
                 }
             }
             catch (const std::exception &e)
             {
                 event.edit_response(error_messages.at("error"));
-                co_return false;
+                co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error")}};
             }
         }
     }
@@ -92,14 +93,14 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
         if (callback.is_error())
         {
             event.edit_response(error_messages.at("error"));
-            co_return false;
+            co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error")}};
         }
 
         const auto &messages = callback.get<dpp::message_map>();
         if (messages.empty())
         {
             event.edit_response(error_messages.at("error_no_messages"));
-            co_return false;
+            co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error_no_messages")}};
         }
 
         std::vector<dpp::snowflake> msg_ids;
@@ -122,10 +123,16 @@ dpp::task<bool> delete_action(const dpp::slashcommand_t &event, const nlohmann::
             if (delete_result.is_error())
             {
                 event.edit_response(error_messages.at("error"));
-                co_return false;
+                co_return std::unordered_map<std::string, std::string>{{"error", error_messages.at("error")}};
             }
+            amount = msg_ids.size();
         }
     }
 
-    co_return true;
+    std::string key = action.contains("key") ? action["key"] : "delete";
+
+    co_return std::unordered_map<std::string, std::string>{
+        {"success", "Messages deleted successfully."},
+        {key + ".amount", std::to_string(amount)},
+    };
 }

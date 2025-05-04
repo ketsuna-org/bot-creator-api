@@ -69,8 +69,36 @@ func main() {
 			return
 		}
 		// let's check if the bot is already running
+		// let's parse the body.
+		var body map[string]interface{}
 
-		bot, err = internal.Start(bot)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			log.Printf("[SERVER] Error decoding JSON: %v", err)
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if body["intents"] == nil {
+			// intents are the default ones we can set the default ones
+			body["intents"] = "3243773"
+		}
+		if body["data"] == nil {
+			// data are the default ones we can set the default ones
+			fmt.Printf("[SERVER] No data found, setting default ones")
+			body["data"] = map[string]interface{}{}
+		}
+
+		// let's convert the data to a string
+		data, err := json.Marshal(body["data"])
+		if err != nil {
+			log.Printf("[SERVER] Error marshaling JSON: %v", err)
+			http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Printf("[SERVER] Starting bot with data: %s", string(data))
+
+		bot, err = internal.Start(bot, string(data), fmt.Sprint(body["intents"]))
 		if err != nil {
 			log.Printf("[SERVER] Error starting bot: %v", err)
 			http.Error(w, "Error starting bot", http.StatusInternalServerError)
