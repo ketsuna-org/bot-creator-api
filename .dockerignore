@@ -22,3 +22,4 @@ CMakeFiles/
 cmake-build-*/
 Makefile
 CMakeCache.txt
+.env

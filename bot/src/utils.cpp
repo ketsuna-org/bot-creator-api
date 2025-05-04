@@ -1,10 +1,4 @@
-#include <dpp/dpp.h>
-#include <dpp/nlohmann/json.hpp>
-#include <map>
-#include <string>
-#include <regex>
-#include <sstream>
-#include <algorithm>
+#include "../include/utils.hpp"
 
 using namespace dpp;
 namespace app
@@ -211,5 +205,36 @@ namespace app
             std::cerr << "JSON exception: " << e.what() << std::endl;
         }
         return str;
+    }
+
+    Lang get_available_locale(std::string locale)
+    {
+        std::transform(locale.begin(), locale.end(), locale.begin(), ::tolower);
+        if (locale == "fr" || locale == "fr-fr")
+            return Lang::fr;
+        else if (locale == "en" || locale == "en-us")
+            return Lang::en;
+        else
+            return Lang::en; // Default to English if no match is found
+    }
+
+    std::string translate(const std::string &str, const std::string &locale, const std::unordered_map<Lang, std::unordered_map<std::string, std::string>> &array_translations, const std::unordered_map<std::string, std::string> &args)
+    {
+        Lang lang = get_available_locale(locale);
+        auto it = array_translations.find(lang);
+        if (it != array_translations.end())
+        {
+            auto it2 = it->second.find(str);
+            if (it2 != it->second.end())
+            {
+                std::string translation = it2->second;
+                for (const auto &arg : args)
+                {
+                    translation = update_string(translation, args);
+                }
+                return translation;
+            }
+        }
+        return str; // Return the original string if no translation is found
     }
 }

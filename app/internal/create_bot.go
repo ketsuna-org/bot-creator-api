@@ -17,10 +17,10 @@ type Bot struct {
 	client    *http.Client
 }
 
-func Start(b *Bot) (*Bot, error) {
+func Start(b *Bot, data string, intents string) (*Bot, error) {
 	// Create a new ZeroMQ socket specifically for this bot
 	// Configuration du bot
-	cmd := exec.Command("./discord-bot", b.BotToken, b.ProcessID) // Passer le port unique
+	cmd := exec.Command("./discord-bot", b.BotToken, b.ProcessID, data, intents)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true, // Permet de tuer le processus enfant si nécessaire
 	}
