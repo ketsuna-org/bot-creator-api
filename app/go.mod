@@ -6,6 +6,7 @@ require (
 	github.com/arangodb/go-driver/v2 v2.1.3 // indirect
 	github.com/arangodb/go-velocypack v0.0.0-20200318135517-5af53c29c67e // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kkdai/maglev v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
