@@ -1,4 +1,4 @@
-package internal
+package utils
 
 import (
 	"log"
@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/ketsuna-org/bot-creator-api/internal/utils"
 )
 
 func LogMiddleware(next http.Handler) http.Handler {
@@ -29,7 +28,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			utils.RespondWithError(w, http.StatusUnauthorized, "Missing authorization header")
+			RespondWithError(w, http.StatusUnauthorized, "Missing authorization header")
 			return
 		}
 		tokenString := authHeader[len("Bearer "):]
@@ -42,14 +41,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return []byte(os.Getenv("JWT_SECRET")), nil
 		})
 		if err != nil {
-			utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token")
+			RespondWithError(w, http.StatusUnauthorized, "Invalid token")
 			return
 		}
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 			// You can access claims here
 			log.Printf("User ID: %v", claims["user_id"])
 		} else {
-			utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token claims")
+			RespondWithError(w, http.StatusUnauthorized, "Invalid token claims")
 			return
 		}
 
