@@ -5,22 +5,18 @@
 #include <unordered_map>
 
 dpp::activity_type activity_type_from_string(const std::string &type) {
-  if (type == "playing") {
-    return dpp::activity_type::at_game;
-  } else if (type == "streaming") {
-    return dpp::activity_type::at_streaming;
-  } else if (type == "listening") {
-    return dpp::activity_type::at_listening;
-  } else if (type == "watching") {
-    return dpp::activity_type::at_watching;
-  } else if (type == "custom") {
-    return dpp::activity_type::at_custom;
-  } else if (type == "competing") {
-    return dpp::activity_type::at_competing;
-  } else {
-    return dpp::activity_type::at_game; // Default to "playing" if the type is
-                                        // unknown
+  static const std::pair<std::string, dpp::activity_type> type_map[] = {
+      {"playing",   dpp::activity_type::at_game},
+      {"streaming", dpp::activity_type::at_streaming},
+      {"listening", dpp::activity_type::at_listening},
+      {"watching",  dpp::activity_type::at_watching},
+      {"custom",    dpp::activity_type::at_custom},
+      {"competing", dpp::activity_type::at_competing}
+  };
+  for (const auto& kv : type_map) {
+      if (kv.first == type) return kv.second;
   }
+  return dpp::activity_type::at_game; // default
 }
 
 int main(int argc, char *argv[]) {
